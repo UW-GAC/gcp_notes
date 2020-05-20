@@ -7,6 +7,10 @@ Creating a Slurm-on-GCP Cluster
     Note: One way to identify OS Login username:
     $ gcloud compute os-login describe-profile | grep username
 
+  ❏ IAM Roles
+    Reference: https://cloud.google.com/iam/docs
+    Appropriate roles and permissions must be in place
+
   ❏ Shared VPC Project
     Reference: https://cloud.google.com/vpc/docs/shared-vpc
     Note: Project 'topmed-dcc-xpn-host' is used in this guide
@@ -37,7 +41,7 @@ Creating a Slurm-on-GCP Cluster
 
 ❏ Download terraform-deployment example file
   $ cd ~/slurm-gcp/tf/examples/tm1
-  $ wget <url>/tm1.tfvars
+  $ wget https://raw.githubusercontent.com/UW-GAC/gcp_notes/master/tm1.tfvars
 
 ❏ Edit the file as appropriate for your environment
     ❏ shared vpc
@@ -46,12 +50,12 @@ Creating a Slurm-on-GCP Cluster
 
 ❏ Download cluster-customization example scripts
   $ cd ~/slurm-gcp/scripts/
-  $ wget <url>/custom-compute-install
-  $ wget <url>/custom-controller-install
+  $ wget https://raw.githubusercontent.com/UW-GAC/gcp_notes/master/custom-compute-install
+  $ wget https://raw.githubusercontent.com/UW-GAC/gcp_notes/master/custom-controller-install
 
 ❏ Edit the files as appropriate for your environment
 
-❏ (Re-)initialize and/or (re-)set gcloud project environment (if necessary)
+❏ (Re-)initialize and/or (re-)set gcloud project environment (if necessary). For example:
   $ gcloud init
   $ gcloud config set project eighth-road-244120
 
@@ -73,8 +77,8 @@ Creating a Slurm-on-GCP Cluster
 
   ❏ Adjust Slurm compute-resource settings
 
-    ❏ Connect to login instance. For example, with 'gcloud':
-      $ $ gcloud beta compute ssh --zone "us-west1-a" "tm1-login0" --project "eighth-road-244120"
+    ❏ Connect to login instance. For example:
+      $ gcloud beta compute ssh --zone "us-west1-a" "tm1-login0" --project "eighth-road-244120"
 
     ❏ Edit the slurm configuration file (/apps/slurm/current/etc/slurm.conf) as follows
       ❏ change the default SelectTypeParameters setting (CR_Core_Memory) to 'CR_CPU_Memory'
