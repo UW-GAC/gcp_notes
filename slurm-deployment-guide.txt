@@ -9,7 +9,15 @@ Creating a Slurm-on-GCP Cluster
 
   ❏ IAM Roles
     Reference: https://cloud.google.com/iam/docs
-    Appropriate roles and permissions must be in place
+    Note: Appropriate roles and permissions must be in place
+      Roles granted to project member perforning cluster deployment in this case:
+        Owner
+        Project Deleter
+        Project IAM Admin
+        Project Mover
+        Quota Administrator
+        Service Usage Admin
+        Compute OS Login
 
   ❏ Shared VPC Project
     Reference: https://cloud.google.com/vpc/docs/shared-vpc
@@ -47,6 +55,10 @@ Creating a Slurm-on-GCP Cluster
     ❏ shared vpc
     ❏ storage
     ❏ other
+
+❏ Remove empty-placeholder cluster-customization scripts
+  $ cd ~/slurm-gcp/scripts/
+  $ rm custom-*-install
 
 ❏ Download cluster-customization example scripts
   $ cd ~/slurm-gcp/scripts/
