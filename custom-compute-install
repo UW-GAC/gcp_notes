@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+# update system
+sudo yum -y update
+
+# add groups
+sudo groupadd -g 991 docker
+sudo groupadd -g 2049 topmed
+
+# add user
+sudo useradd -u 2049 -g 2049 topmed
+
+# add users to groups
+sudo usermod -aG docker topmed
+sudo usermod -aG docker,topmed ext_kuraisa_uw_edu
+sudo usermod -aG docker,topmed ext_levined_uw_edu
+sudo usermod -aG docker,topmed ext_rmoulton_uw_edu
+
+# install docker
+curl -fsSL https://get.docker.com/ | sh
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# for gcsfuse enable 'user_allow_other' option
+sudo cp -p /etc/fuse.conf /etc/fuse.conf.orig
+sudo tee /etc/fuse.conf > /dev/null <<EOT
+user_allow_other
+EOT
+
+### create some shell-initialization scripts ###
+
+# add /apps/bin to path
+sudo tee /etc/profile.d/apps-bin.sh > /dev/null <<EOT
+PATH=/apps/bin:\${PATH}
+EOT
+
+# set default python2
+sudo tee /etc/profile.d/python27.sh > /dev/null <<EOT
+PYTHON2=/apps/python-2.7
+PATH=\$PYTHON2/bin:\${PATH}
+EOT
+
+# set default python3
+sudo tee /etc/profile.d/python3.sh > /dev/null <<EOT
+PYTHON3=/apps/python-3.6
+PATH=\$PYTHON3/bin:\${PATH}
+EOT
+
+# explicitly reset cloudsdk python
+sudo tee /etc/profile.d/cloudsdk_python27.sh > /dev/null <<EOT
+export CLOUDSDK_PYTHON=/usr/bin/python
+EOT
+
+# disable yum-cron service
+sudo systemctl stop yum-cron
+sudo systemctl disable yum-cron
+
+### login instance and compute node specific customization ###
+
+# none
