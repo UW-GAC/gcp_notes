@@ -10,3 +10,5 @@ The notes include:
   - Support of Slurm on GCP
   - Issues encountered
 - `AnalysisPipeline_Slurm_Workflow.pdf` - Architectural overview of Analysis Pipeline on Slurm
+- `slurm-deployment-guide.txt` - Slurm deployment guide (duh!)
+- `GCP_Slurm_Issues_and_Resolutions.pdf'` - Various issues encountered and their resolutions
