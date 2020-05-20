@@ -11,4 +11,7 @@ The notes include:
   - Issues encountered
 - `AnalysisPipeline_Slurm_Workflow.pdf` - Architectural overview of Analysis Pipeline on Slurm
 - `slurm-deployment-guide.txt` - Slurm deployment guide (duh!)
+- `custom-compute-install` - Slurm deployment for compute nodes
+- `custom-controller-install` - Slurm deployment for controller
+- `tm1.tfvars` - Slurm deployment terraform file
 - `GCP_Slurm_Issues_and_Resolutions.pdf'` - Various issues encountered and their resolutions
