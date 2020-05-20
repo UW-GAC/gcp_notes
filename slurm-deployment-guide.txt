@@ -1,0 +1,141 @@
+Creating a Slurm-on-GCP Cluster
+
+❏ Prerequisites
+
+  ❏ OS Login
+    Reference: https://cloud.google.com/compute/docs/oslogin/
+    Note: One way to identify OS Login username:
+    $ gcloud compute os-login describe-profile | grep username
+
+  ❏ Shared VPC Project
+    Reference: https://cloud.google.com/vpc/docs/shared-vpc
+    Note: Project 'topmed-dcc-xpn-host' is used in this guide
+
+  ❏ Storage (NFS or other)
+    Notes:
+      The slurm cluster deployment controller instance provides a built-in NFS-export storage option
+      A self-deployed NFS server instance (hostname: 'nfs1') is used in this guide 
+      Cloud Storage FUSE is also used (read-only access)
+        Reference: https://cloud.google.com/storage/docs/gcs-fuse
+
+  ❏ Google Cloud Shell
+    Reference: https://cloud.google.com/shell
+    Cloud Shell is used in this guide
+    Note: With Cloud SDK and Terraform installed (and appropriate credentials in place), deployment can be done from other systems
+     References:
+       https://cloud.google.com/sdk/install
+       https://www.terraform.io/downloads.html
+       https://www.terraform.io/docs/providers/google/guides/getting_started.html#adding-credentials
+
+❏ Download Slurm on GCP code
+  Reference: https://github.com/SchedMD/slurm-gcp
+  $ git clone https://github.com/SchedMD/slurm-gcp.git
+
+❏ Prepare a terraform configuration directory, based on the provided example
+  $ cd ~/slurm-gcp/tf/examples/
+  $ cp -pr basic tm1
+
+❏ Download terraform-deployment example file
+  $ cd ~/slurm-gcp/tf/examples/tm1
+  $ wget <url>/tm1.tfvars
+
+❏ Edit the file as appropriate for your environment
+    ❏ shared vpc
+    ❏ storage
+    ❏ other
+
+❏ Download cluster-customization example scripts
+  $ cd ~/slurm-gcp/scripts/
+  $ wget <url>/custom-compute-install
+  $ wget <url>/custom-controller-install
+
+❏ Edit the files as appropriate for your environment
+
+❏ (Re-)initialize and/or (re-)set gcloud project environment (if necessary)
+  $ gcloud init
+  $ gcloud config set project eighth-road-244120
+
+❏ Initialize terraform environment for the newly-created cluster configuration
+  $ cd ~/slurm-gcp/tf/examples/tm1/
+  $ terraform init
+
+❏ Provision the cluster
+  $ terraform apply -var-file=tm1.tfvars
+
+  Notes:
+   Within a minute or so, Terraform should report: "Apply complete!" 
+   Subsequent cluster-deployment progress can be observed in Cloud Console "Compute Engine"
+   Expect the process to take about ten minutes
+   Upon completion, compute-partition-image instances will automatically shut down
+   (Login and controller instances will remain running)
+
+❏ Perform post-deployment customization
+
+  ❏ Adjust Slurm compute-resource settings
+
+    ❏ Connect to login instance. For example, with 'gcloud':
+      $ $ gcloud beta compute ssh --zone "us-west1-a" "tm1-login0" --project "eighth-road-244120"
+
+    ❏ Edit the slurm configuration file (/apps/slurm/current/etc/slurm.conf) as follows
+      ❏ change the default SelectTypeParameters setting (CR_Core_Memory) to 'CR_CPU_Memory'
+      ❏ in the partition-definition section, change the default Least Loaded Nodes (LLN) settings from the default (yes) to 'no'
+      
+    ❏ Restart slurm controller daemon
+      $ ssh tm1-controller ' sudo systemctl restart slurmctld '
+
+  ❏ Preload docker image on compute-partition images
+
+    ❏ Launch a partition-image instance -- with 'gcloud', for example:
+      $ gcloud compute instances start tm1-compute-0-image
+
+    ❏ Connect to instance
+      $ ssh tm1-compute-0-image
+
+    ❏ Download docker image
+      $ docker pull uwgac/topmed-roybranch
+
+    ❏ Shut down instance
+      $ sudo shutdown -h now
+
+    ❏ Generate new images for each partition, based on the newly-updated instance:
+      $ gcloud compute images create tm1-compute-0-image-$(date '+%Y-%m-%d-%H-%M-%S') --source-disk tm1-compute-0-image --source-disk-zone us-west1-a --force --family tm1-compute-0-image-family
+      $ gcloud compute images create tm1-compute-1-image-$(date '+%Y-%m-%d-%H-%M-%S') --source-disk tm1-compute-0-image --source-disk-zone us-west1-a --force --family tm1-compute-1-image-family
+      $ gcloud compute images create tm1-compute-2-image-$(date '+%Y-%m-%d-%H-%M-%S') --source-disk tm1-compute-0-image --source-disk-zone us-west1-a --force --family tm1-compute-2-image-family
+      $ gcloud compute images create tm1-compute-3-image-$(date '+%Y-%m-%d-%H-%M-%S') --source-disk tm1-compute-0-image --source-disk-zone us-west1-a --force --family tm1-compute-3-image-family
+      $ gcloud compute images create tm1-compute-4-image-$(date '+%Y-%m-%d-%H-%M-%S') --source-disk tm1-compute-0-image --source-disk-zone us-west1-a --force --family tm1-compute-4-image-family
+      $ gcloud compute images create tm1-compute-5-image-$(date '+%Y-%m-%d-%H-%M-%S') --source-disk tm1-compute-0-image --source-disk-zone us-west1-a --force --family tm1-compute-5-image-family
+      $ gcloud compute images create tm1-compute-6-image-$(date '+%Y-%m-%d-%H-%M-%S') --source-disk tm1-compute-0-image --source-disk-zone us-west1-a --force --family tm1-compute-6-image-family
+
+    Note:
+     Expect each image-creation process to take about five minutes
+
+❏ Test
+
+  ❏ Create a test script. For example, 'sleep10.sh':
+    #!/bin/bash
+    # sleep for 10 seconds
+    sleep 10
+    # report hostname
+    hostname
+    # verify that docker image is present
+    docker images
+    # verify that fuse mount is present
+    ls /fuse/
+
+  ❏ Submit the script to each partition. For example:
+    $ squeue -l
+    $ sbatch -p tm1-2-13 sleep10.sh
+    $ sbatch -p tm1-4-26 sleep10.sh
+    $ sbatch -p tm1-8-30 sleep10.sh
+    $ sbatch -p tm1-8-52 sleep10.sh
+    $ sbatch -p tm1-16-60 sleep10.sh
+    $ sbatch -p tm1-16-104 sleep10.sh
+    $ sbatch -p tm1-32-208 sleep10.sh
+    $ squeue -l
+
+    Notes:
+     Expect jobs to spend 1-2 minutes in "configuring" state (as reported by 'squeue -l')
+     "Running" state should last just ten seconds
+
+  ❏ Verify job output. For example:
+    $ cat slurm-*.out
