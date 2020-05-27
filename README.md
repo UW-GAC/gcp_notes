@@ -15,3 +15,5 @@ The notes include:
 - `custom-controller-install` - Slurm deployment for controller
 - `tm1.tfvars` - Slurm deployment terraform file
 - `GCP_Slurm_Issues_and_Resolutions.pdf'` - Various issues encountered and their resolutions
+- `TAM_Notes_Dave.pdf`-Chronological list of questions/notes/resources with Google
+
