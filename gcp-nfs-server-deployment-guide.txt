@@ -1,0 +1,146 @@
+Creating an NFS server on GCP
+
+❏ Prerequisites
+
+  ❏ OS Login
+    Reference: https://cloud.google.com/compute/docs/oslogin/
+    Note: One way to identify OS Login username:
+    $ gcloud compute os-login describe-profile | grep username
+
+  ❏ IAM Roles
+    Reference: https://cloud.google.com/iam/docs
+    Note: Appropriate roles and permissions must be in place
+      Roles granted to project member perforning instance deployment in this case:
+        Owner
+        Project Deleter
+        Project IAM Admin
+        Project Mover
+        Quota Administrator
+        Service Usage Admin
+        Compute OS Login
+
+  ❏ Shared VPC Project
+    Reference: https://cloud.google.com/vpc/docs/shared-vpc
+    Note: Project 'topmed-dcc-xpn-host' is used in this guide
+
+  ❏ Google Cloud Shell
+    Reference: https://cloud.google.com/shell
+    Cloud Shell is used in this guide
+    Note: With Cloud SDK installed (and appropriate credentials in place), deployment can be done from other systems
+     References:
+       https://cloud.google.com/sdk/install
+
+❏ Create the nfs server instance
+  For example, an instance named 'nfs2' with a 3 TB storage volume:
+  $ gcloud beta compute --project=topmed-dcc-storage instances create nfs2 \
+    --zone=us-west1-a --machine-type=n1-standard-32 \
+    --subnet=projects/topmed-dcc-xpn-host/regions/us-west1/subnetworks/default \
+    --network-tier=PREMIUM --maintenance-policy=MIGRATE \
+    --service-account=594319695055-compute@developer.gserviceaccount.com \
+    --scopes=https://www.googleapis.com/auth/cloud-platform \
+    --image=centos-7-v20190729 --image-project=centos-cloud \
+    --boot-disk-size=100GB --boot-disk-type=pd-ssd --boot-disk-device-name=nfs2 \
+    --create-disk=mode=rw,size=3000,type=projects/topmed-dcc-storage/zones/us-west1-a/diskTypes/pd-ssd,name=nfs2data,device-name=nfs2data \
+    --labels=instance_name=nfs2 --reservation-affinity=any
+
+❏ Perform post-deployment configuration
+
+  ❏ Connect to newly-deployed instance. For example:
+    $ gcloud beta compute ssh --zone "us-west1-a" "nfs2" --project "topmed-dcc-storage"
+
+  ❏ Update system
+    $ sudo yum update -y
+
+  ❏ Stop and disable yum-cron service
+    $ sudo systemctl stop yum-cron
+    $ sudo systemctl disable yum-cron
+
+  ❏ Configure NFS
+
+    ❏ Install nfs-utils
+      $ sudo yum install -y nfs-utils
+
+    ❏ Identify storage volume
+      $ sudo lsblk
+        Note: In the resulting output, look for the unpartitioned/unmounted device -- 'sdb' in this case:
+
+        NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+        sda      8:0    0  100G  0 disk
+        └─sda1   8:1    0  100G  0 part /
+        sdb      8:16   0  100G  0 disk
+
+    ❏ Format the device. For example:
+      $ sudo mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard /dev/sdb
+
+    ❏ Identify device UUID. For example:
+      $ sudo blkid /dev/sdb
+
+    ❏ Edit the static filesystem information file (/etc/fstab) as follows
+      ❏ add a line defining a mount of the newly-created filesystem by its previously-identified UUID
+        For example:
+        UUID=110ad62a-0864-42cc-abc4-179a359d152f /nfs2-data ext4 discard,defaults,nofail 0 2
+
+    ❏ Create the mount point and mount the filesystem. For example:
+      $ sudo mkdir /nfs2-data
+      $ sudo mount /nfs2-data
+
+    ❏ Create export directories and adjust their permissions. For example:
+      $ sudo mkdir /nfs2-data/{topmed_admin,topmed_home,projects}
+      $ sudo chmod 2777 /nfs2-data/[tp]*
+
+    ❏ Edit the nfs-server export table file (/etc/exports) as follows
+      ❏ add lines defining exports of the newly-created directories
+        For example:
+        /nfs2-data/projects  *(rw,no_subtree_check,no_root_squash)
+        /nfs2-data/topmed_admin  *(rw,no_subtree_check,no_root_squash)
+        /nfs2-data/topmed_home  *(rw,no_subtree_check,no_root_squash)
+
+    ❏ Edit the nfs-server system configuration file (/etc/exports) as follows
+      ❏ set nfs server process count (RPCNFSDCOUNT) to 512
+        For example:
+        $ sudo cp /etc/sysconfig/nfs /etc/sysconfig/nfs.orig
+        $ sudo vi /etc/sysconfig/nfs
+        $ diff /etc/sysconfig/nfs.release /etc/sysconfig/nfs
+        17c17
+        < #RPCNFSDCOUNT=16
+        ---
+        > RPCNFSDCOUNT=512
+
+
+    ❏ Enable and start nfs
+      $ sudo systemctl enable nfs
+      $ sudo systemctl start nfs
+
+    ❏ View export list. For example, in this case:
+      $ showmount -e localhost
+      Export list for localhost:
+      /nfs2-data/topmed_home  *
+      /nfs2-data/topmed_admin *
+      /nfs2-data/projects     *
+
+    ❏ Verify that 512 nfsd processes are running:
+      $ ps -aux | grep -F "[nfsd]" | grep root | wc -l
+
+  ❏ Configure data ownership
+
+    ❏ Add local groups
+      $ sudo groupadd -g 991 docker
+      $ sudo groupadd -g 2049 topmed
+
+    ❏ Add local user
+      $ sudo useradd -u 2049 -g 2049 topmed
+
+    ❏ Add users to groups
+      $ sudo usermod -aG docker topmed
+      $ sudo usermod -aG docker,topmed ext_kuraisa_uw_edu
+      $ sudo usermod -aG docker,topmed ext_levined_uw_edu
+      $ sudo usermod -aG docker,topmed ext_rmoulton_uw_edu
+
+    ❏ Change group ownership of export directories
+      $ sudo chgrp -R topmed /nfs2-data/[tp]*
+
+  ❏ Reboot system
+    $ sudo shutdown -r now
+    Note: This is strictly necessary only to ensure that a newly-installed kernel is running
+
+❏ Copy data into place
